@@ -16,6 +16,7 @@ return await Pulumi.Deployment.RunAsync(() =>
 {
     // Create an Azure Resource Group
     var resourceGroup = new ResourceGroup("resourceGroup");
+    
 
     // Get current Azure configuration
     var currentConfig = Pulumi.AzureNative.Authorization.GetClientConfig.Invoke();
