@@ -9,6 +9,7 @@ on:
       - main
 jobs:
   validate:
+    environment: dev
     name: Validate Infrastructure
     runs-on: ubuntu-latest
     
