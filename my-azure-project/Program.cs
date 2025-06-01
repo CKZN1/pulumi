@@ -17,13 +17,16 @@ return await Pulumi.Deployment.RunAsync(() =>
     // Create an Azure Resource Group
     var resourceGroup = new ResourceGroup("resourceGroup");
 
+    // Get current Azure configuration
+    var currentConfig = Pulumi.AzureNative.Authorization.GetClientConfig.Invoke();
+    
     // Create a Key Vault for storing secrets
     var keyVault = new Vault("keyVault", new VaultArgs
     {
         ResourceGroupName = resourceGroup.Name,
         Properties = new VaultPropertiesArgs
         {
-            TenantId = "your-tenant-id", // Replace with your Azure AD tenant ID
+            TenantId = currentConfig.Apply(config => config.TenantId),
             Sku = new Pulumi.AzureNative.KeyVault.Inputs.SkuArgs
             {
                 Family = "A",
@@ -33,8 +36,8 @@ return await Pulumi.Deployment.RunAsync(() =>
             {
                 new AccessPolicyEntryArgs
                 {
-                    TenantId = "your-tenant-id", // Replace with your tenant ID
-                    ObjectId = "your-object-id", // Replace with your object ID
+                    TenantId = currentConfig.Apply(config => config.TenantId),
+                    ObjectId = currentConfig.Apply(config => config.ObjectId),
                     Permissions = new PermissionsArgs
                     {
                         Keys = { "get", "list", "create", "delete", "update", "backup", "restore" },
@@ -79,8 +82,8 @@ return await Pulumi.Deployment.RunAsync(() =>
         return firstKey;
     });
 
-    // Create Cosmos DB Account
-    var cosmosAccount = new DatabaseAccount("cosmosAccount", new DatabaseAccountArgs
+    // Create Cosmos DB Account (fix naming issue)
+    var cosmosAccount = new DatabaseAccount("cosmosdb", new DatabaseAccountArgs
     {
         ResourceGroupName = resourceGroup.Name,
         DatabaseAccountOfferType = DatabaseAccountOfferType.Standard,
@@ -105,12 +108,24 @@ return await Pulumi.Deployment.RunAsync(() =>
         AccountName = cosmosAccount.Name
     });
 
-    // Create Application Insights
+    // Create Log Analytics Workspace (required for Application Insights)
+    var logAnalyticsWorkspace = new Pulumi.AzureNative.OperationalInsights.Workspace("logAnalytics", new()
+    {
+        ResourceGroupName = resourceGroup.Name,
+        Sku = new Pulumi.AzureNative.OperationalInsights.Inputs.WorkspaceSkuArgs
+        {
+            Name = "PerGB2018"
+        },
+        RetentionInDays = 30
+    });
+
+    // Create Application Insights with Log Analytics workspace
     var appInsights = new Component("appInsights", new ComponentArgs
     {
         ResourceGroupName = resourceGroup.Name,
         ApplicationType = ApplicationType.Web,
-        Kind = "web"
+        Kind = "web",
+        WorkspaceResourceId = logAnalyticsWorkspace.Id
     });
 
     // Create App Service Plan with custom auto scaling
@@ -125,7 +140,71 @@ return await Pulumi.Deployment.RunAsync(() =>
         }
     });
 
-    
+    // // Create Auto Scale Settings for App Service Plan
+    // var autoScaleSettings = new AutoscaleSetting("autoScaleSettings", new AutoscaleSettingArgs
+    // {
+    //     ResourceGroupName = resourceGroup.Name,
+    //     TargetResourceUri = appServicePlan.Id,
+    //     Enabled = true,
+    //     Profiles = new[]
+    //     {
+    //         new AutoscaleProfileArgs
+    //         {
+    //             Name = "defaultProfile",
+    //             Capacity = new ScaleCapacityArgs
+    //             {
+    //                 Minimum = "1",
+    //                 Maximum = "10",
+    //                 Default = "1"
+    //             },
+    //             Rules = new[]
+    //             {
+    //                 new ScaleRuleArgs
+    //                 {
+    //                     MetricTrigger = new MetricTriggerArgs
+    //                     {
+    //                         MetricName = "CpuPercentage",
+    //                         MetricResourceUri = appServicePlan.Id,
+    //                         TimeGrain = "PT1M",
+    //                         Statistic = MetricStatisticType.Average,
+    //                         TimeWindow = "PT10M",
+    //                         TimeAggregation = TimeAggregationType.Average,
+    //                         Operator = ComparisonOperationType.GreaterThan,
+    //                         Threshold = 70
+    //                     },
+    //                     ScaleAction = new ScaleActionArgs
+    //                     {
+    //                         Direction = ScaleDirection.Increase,
+    //                         Type = ScaleType.ChangeCount,
+    //                         Value = "1",
+    //                         Cooldown = "PT10M"
+    //                     }
+    //                 },
+    //                 new ScaleRuleArgs
+    //                 {
+    //                     MetricTrigger = new MetricTriggerArgs
+    //                     {
+    //                         MetricName = "CpuPercentage",
+    //                         MetricResourceUri = appServicePlan.Id,
+    //                         TimeGrain = "PT1M",
+    //                         Statistic = MetricStatisticType.Average,
+    //                         TimeWindow = "PT10M",
+    //                         TimeAggregation = TimeAggregationType.Average,
+    //                         Operator = ComparisonOperationType.LessThan,
+    //                         Threshold = 25
+    //                     },
+    //                     ScaleAction = new ScaleActionArgs
+    //                     {
+    //                         Direction = ScaleDirection.Decrease,
+    //                         Type = ScaleType.ChangeCount,
+    //                         Value = "1",
+    //                         Cooldown = "PT10M"
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // });
 
     // Create Web App with temp slot
     var webApp = new WebApp("webApp", new WebAppArgs
@@ -177,7 +256,7 @@ return await Pulumi.Deployment.RunAsync(() =>
         }
     });
 
-    // Create API Management Service
+    // Create API Management Service (fix Developer SKU settings)
     var apiManagement = new ApiManagementService("apiManagement", new ApiManagementServiceArgs
     {
         ResourceGroupName = resourceGroup.Name,
@@ -188,6 +267,7 @@ return await Pulumi.Deployment.RunAsync(() =>
         },
         PublisherEmail = "admin@example.com", // Replace with your email
         PublisherName = "Your Organization", // Replace with your organization name
+        EnableClientCertificate = true // Developer SKU requires this to be true
     });
 
     // Create API in API Management
