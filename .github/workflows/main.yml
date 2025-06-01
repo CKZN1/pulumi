@@ -24,11 +24,11 @@ jobs:
 
     - name: Restore dependencies
       run: dotnet restore
-      working-directory: ./
+      working-directory: ./my-azure-project
 
     - name: Build project
       run: dotnet build --no-restore
-      working-directory: ./
+      working-directory: ./my-azure-project
 
     - name: Setup Pulumi CLI
       uses: pulumi/actions@v5
@@ -54,6 +54,6 @@ jobs:
       with:
         command: preview
         stack-name: dev
-        work-dir: ./
+        work-dir: ./my-azure-project
         comment-on-pr: true
         diff: true
