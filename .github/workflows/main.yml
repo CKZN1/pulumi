@@ -2,7 +2,7 @@ name: CI - Infrastructure Validation
 
 on:
   push:
-    branches-ignore:
+    branches:
       - main
   pull_request:
     branches:
