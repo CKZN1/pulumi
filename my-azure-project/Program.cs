@@ -16,11 +16,11 @@ return await Pulumi.Deployment.RunAsync(() =>
 {
     // Create an Azure Resource Group
     var resourceGroup = new ResourceGroup("resourceGroup");
-    
+
 
     // Get current Azure configuration
     var currentConfig = Pulumi.AzureNative.Authorization.GetClientConfig.Invoke();
-    
+
     // Create a Key Vault for storing secrets
     var keyVault = new Vault("keyVault", new VaultArgs
     {
@@ -224,7 +224,7 @@ return await Pulumi.Deployment.RunAsync(() =>
                 new NameValuePairArgs
                 {
                     Name = "CosmosConnectionString",
-                    Value = cosmosKeys.Apply(keys => 
+                    Value = cosmosKeys.Apply(keys =>
                         $"AccountEndpoint={cosmosAccount.DocumentEndpoint};AccountKey={keys.PrimaryMasterKey};")
                 }
             }
@@ -250,7 +250,7 @@ return await Pulumi.Deployment.RunAsync(() =>
                 new NameValuePairArgs
                 {
                     Name = "CosmosConnectionString",
-                    Value = cosmosKeys.Apply(keys => 
+                    Value = cosmosKeys.Apply(keys =>
                         $"AccountEndpoint={cosmosAccount.DocumentEndpoint};AccountKey={keys.PrimaryMasterKey};")
                 }
             }
@@ -269,6 +269,28 @@ return await Pulumi.Deployment.RunAsync(() =>
         PublisherEmail = "admin@example.com", // Replace with your email
         PublisherName = "Your Organization", // Replace with your organization name
         EnableClientCertificate = true // Developer SKU requires this to be true
+    });
+
+    var apiSecret = new Secret("apiSecret", new SecretArgs
+    {
+        VaultName = keyVault.Name,
+        ResourceGroupName = resourceGroup.Name,
+        Properties = new SecretPropertiesArgs
+        {
+            Value = "your-secret-value"
+        }
+    });
+
+    // Create named value in APIM that references Key Vault
+    var namedValue = new NamedValue("namedValue", new NamedValueArgs
+    {
+        ResourceGroupName = resourceGroup.Name,
+        ServiceName = apiManagement.Name,
+        DisplayName = "MySecret",
+        KeyVault = new KeyVaultContractCreatePropertiesArgs
+        {
+            SecretIdentifier = apiSecret.Id
+        }
     });
 
     // Create API in API Management
