@@ -11,6 +11,8 @@ using Pulumi.AzureNative.KeyVault.Inputs;
 using System.Collections.Generic;
 using Pulumi.AzureNative.CosmosDB.Inputs;
 using Pulumi.AzureNative.ApplicationInsights;
+using Pulumi.AzureNative.Monitor;
+using Pulumi.AzureNative.Monitor.Inputs;
 
 return await Pulumi.Deployment.RunAsync(() =>
 {
@@ -142,70 +144,73 @@ return await Pulumi.Deployment.RunAsync(() =>
     });
 
     // // Create Auto Scale Settings for App Service Plan
-    // var autoScaleSettings = new AutoscaleSetting("autoScaleSettings", new AutoscaleSettingArgs
-    // {
-    //     ResourceGroupName = resourceGroup.Name,
-    //     TargetResourceUri = appServicePlan.Id,
-    //     Enabled = true,
-    //     Profiles = new[]
-    //     {
-    //         new AutoscaleProfileArgs
-    //         {
-    //             Name = "defaultProfile",
-    //             Capacity = new ScaleCapacityArgs
-    //             {
-    //                 Minimum = "1",
-    //                 Maximum = "10",
-    //                 Default = "1"
-    //             },
-    //             Rules = new[]
-    //             {
-    //                 new ScaleRuleArgs
-    //                 {
-    //                     MetricTrigger = new MetricTriggerArgs
-    //                     {
-    //                         MetricName = "CpuPercentage",
-    //                         MetricResourceUri = appServicePlan.Id,
-    //                         TimeGrain = "PT1M",
-    //                         Statistic = MetricStatisticType.Average,
-    //                         TimeWindow = "PT10M",
-    //                         TimeAggregation = TimeAggregationType.Average,
-    //                         Operator = ComparisonOperationType.GreaterThan,
-    //                         Threshold = 70
-    //                     },
-    //                     ScaleAction = new ScaleActionArgs
-    //                     {
-    //                         Direction = ScaleDirection.Increase,
-    //                         Type = ScaleType.ChangeCount,
-    //                         Value = "1",
-    //                         Cooldown = "PT10M"
-    //                     }
-    //                 },
-    //                 new ScaleRuleArgs
-    //                 {
-    //                     MetricTrigger = new MetricTriggerArgs
-    //                     {
-    //                         MetricName = "CpuPercentage",
-    //                         MetricResourceUri = appServicePlan.Id,
-    //                         TimeGrain = "PT1M",
-    //                         Statistic = MetricStatisticType.Average,
-    //                         TimeWindow = "PT10M",
-    //                         TimeAggregation = TimeAggregationType.Average,
-    //                         Operator = ComparisonOperationType.LessThan,
-    //                         Threshold = 25
-    //                     },
-    //                     ScaleAction = new ScaleActionArgs
-    //                     {
-    //                         Direction = ScaleDirection.Decrease,
-    //                         Type = ScaleType.ChangeCount,
-    //                         Value = "1",
-    //                         Cooldown = "PT10M"
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // });
+    var autoScaleSettings = new AutoscaleSetting("autoScaleSettings", new AutoscaleSettingArgs
+    {
+        ResourceGroupName = resourceGroup.Name,
+        AutoscaleSettingName = "appServicePlanAutoScale",
+        TargetResourceUri = appServicePlan.Id,
+        Enabled = true,
+        Profiles = new[]
+    {
+        new AutoscaleProfileArgs
+        {
+            Name = "defaultProfile",
+            Capacity = new ScaleCapacityArgs
+            {
+                Minimum = "1",
+                Maximum = "10",
+                Default = "1"
+            },
+            Rules = new[]
+            {
+                // Scale up rule
+                new ScaleRuleArgs
+                {
+                    MetricTrigger = new MetricTriggerArgs
+                    {
+                        MetricName = "CpuPercentage",
+                        MetricResourceUri = appServicePlan.Id,
+                        TimeGrain = "PT1M",
+                        Statistic = MetricStatisticType.Average,
+                        TimeWindow = "PT10M",
+                        TimeAggregation = TimeAggregationType.Average,
+                        Operator = ComparisonOperationType.GreaterThan,
+                        Threshold = 70
+                    },
+                    ScaleAction = new ScaleActionArgs
+                    {
+                        Direction = ScaleDirection.Increase,
+                        Type = ScaleType.ChangeCount,
+                        Value = "1",
+                        Cooldown = "PT10M"
+                    }
+                },
+                // Scale down rule
+                new ScaleRuleArgs
+                {
+                    MetricTrigger = new MetricTriggerArgs
+                    {
+                        MetricName = "CpuPercentage",
+                        MetricResourceUri = appServicePlan.Id,
+                        TimeGrain = "PT1M",
+                        Statistic = MetricStatisticType.Average,
+                        TimeWindow = "PT10M",
+                        TimeAggregation = TimeAggregationType.Average,
+                        Operator = ComparisonOperationType.LessThan,
+                        Threshold = 25
+                    },
+                    ScaleAction = new ScaleActionArgs
+                    {
+                        Direction = ScaleDirection.Decrease,
+                        Type = ScaleType.ChangeCount,
+                        Value = "1",
+                        Cooldown = "PT10M"
+                    }
+                }
+            }
+        }
+    }
+    });
 
     // Create Web App with temp slot
     var webApp = new WebApp("webApp", new WebAppArgs
